@@ -155,13 +155,5 @@ go run cmd/susy-bench/main.go -h localhost:7379 -c 50 -n 100000 -test setex
 
 ---
 
-## Roadmap
-- [x] Phase 1: Core Engine (KV, TTL, Hash, Counters)
-- [x] Phase 2: Pub/Sub & Event Notification
-- [ ] Phase 3: Persistence (AOF/RDB Snapshot)
-- [x] Phase 4: Embedded Library Mode
-
----
-
 ## License
 MIT License. See [LICENSE](LICENSE) for details.

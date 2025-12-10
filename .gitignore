@@ -17,3 +17,6 @@ test_results/
 # OS
 .DS_Store
 Thumbs.db
+
+# Personal docs
+RELEASE_GUIDE.md
