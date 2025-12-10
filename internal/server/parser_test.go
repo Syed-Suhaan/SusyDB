@@ -22,9 +22,14 @@ func TestParseCommand(t *testing.T) {
 			want:  []string{"SET", "key", "value with spaces"},
 		},
 		{
-			name:  "json value",
-			input: `SET session:1 "{user:suhaan,role:admin}"`,
-			want:  []string{"SET", "session:1", `{user:suhaan,role:admin}`},
+			name:  "json value with escaped quotes",
+			input: `SET session:1 "{\"user\":\"suhaan\",\"role\":\"admin\"}"`,
+			want:  []string{"SET", "session:1", `{"user":"suhaan","role":"admin"}`},
+		},
+		{
+			name:  "escaped backslash",
+			input: `SET path "C:\\Users\\Suhaan"`,
+			want:  []string{"SET", "path", `C:\Users\Suhaan`},
 		},
 		{
 			name:  "multiple quoted args",
