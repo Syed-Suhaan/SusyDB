@@ -12,8 +12,8 @@ graph TD
     Server -->|Spawns| Goroutine[Client Handler Goroutine]
     Goroutine -->|Reads| Parser[Command Parser]
     Parser -->|Executes| Core[Core KV Store]
-    Core -->|Locking| Mutex[sync.RWMutex]
-    Core -->|Writes| Map[Go Map (Memory)]
+    Core -->|Locking| Mutex["sync.RWMutex"]
+    Core -->|Writes| Map["Go Map - Memory"]
     Background[GC Janitor] -->|Periodically Sweeps| Map
 ```
 
