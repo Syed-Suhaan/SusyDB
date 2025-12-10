@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/Syed-Suhaan/susydb/pkg/core"
+	"github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 func handlePublish(conn net.Conn, store *core.KVStore, parts []string) []byte {

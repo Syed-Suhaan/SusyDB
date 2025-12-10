@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/Syed-Suhaan/susydb/internal/server"
-	"github.com/Syed-Suhaan/susydb/pkg/core"
+	"github.com/Syed-Suhaan/SusyDB/internal/server"
+	"github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 func main() {

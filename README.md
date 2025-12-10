@@ -3,7 +3,7 @@
 > **Tagline**: SusyDB is a tiny, high-performance, in-memory key-value store written in Go, optimized for simple cache, sessions, and counters.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Syed-Suhaan/susydb)](https://goreportcard.com/report/github.com/Syed-Suhaan/susydb)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Syed-Suhaan/SusyDB)](https://goreportcard.com/report/github.com/Syed-Suhaan/SusyDB)
 
 ---
 
@@ -47,7 +47,7 @@ graph LR
     - **Hashes**: `HSET`, `HGET`, `HDEL`, `HGETALL` (Perfect for sessions).
     - **Counters**: `INCR`, `INCRBY` (Rate limiting ready).
 - **Pub/Sub**: Lightweight Message Broker (`PUBLISH`, `SUBSCRIBE`).
-- **Embedded Mode**: Use as a library `import "github.com/Syed-Suhaan/susydb/pkg/core"` in your Go apps.
+- **Embedded Mode**: Use as a library `import "github.com/Syed-Suhaan/SusyDB/pkg/core"` in your Go apps.
 - **Hybrid Expiry**: Lazy + Active TTL implementation.
 - **Architecture**: Thread-safe design using `sync.RWMutex`.
 - **Observability**: `INFO` command for stats.
@@ -57,7 +57,7 @@ graph LR
 ## Quick Start
 ### Installation
 ```bash
-go install github.com/Syed-Suhaan/susydb/cmd/susydb@latest
+go install github.com/Syed-Suhaan/SusyDB/cmd/susydb@latest
 ```
 
 ### Running
@@ -108,7 +108,7 @@ package main
 
 import (
     "fmt"
-    "github.com/Syed-Suhaan/susydb/pkg/core"
+    "github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 func main() {

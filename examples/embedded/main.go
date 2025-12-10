@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Syed-Suhaan/susydb/pkg/core"
+	"github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 func main() {

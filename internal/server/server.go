@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/Syed-Suhaan/susydb/pkg/core"
+	"github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 // Start initializes the TCP server and listens for incoming connections.

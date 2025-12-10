@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Syed-Suhaan/susydb/pkg/core"
+	"github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 func handleSet(conn net.Conn, store *core.KVStore, parts []string) []byte {

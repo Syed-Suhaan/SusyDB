@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Syed-Suhaan/susydb/pkg/core"
+	"github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 func handleInfo(conn net.Conn, store *core.KVStore, parts []string) []byte {

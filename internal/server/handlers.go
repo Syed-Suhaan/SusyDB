@@ -3,7 +3,7 @@ package server
 import (
 	"net"
 
-	"github.com/Syed-Suhaan/susydb/pkg/core"
+	"github.com/Syed-Suhaan/SusyDB/pkg/core"
 )
 
 // CommandHandler is the function signature for all command handlers.
