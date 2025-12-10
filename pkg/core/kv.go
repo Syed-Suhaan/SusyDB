@@ -27,6 +27,11 @@ func (s *KVStore) Set(key string, value string, ttlSeconds int64) error {
 		expiresAt = time.Now().Add(time.Duration(ttlSeconds) * time.Second).UnixNano()
 	}
 
+	// Add to keys slice if new key
+	if !exists {
+		s.addKey(key)
+	}
+
 	s.data[key] = Entry{
 		Value:     value,
 		ExpiresAt: expiresAt,
@@ -57,6 +62,7 @@ func (s *KVStore) Get(key string) (string, bool, error) {
 		currentEntry, currentOk := s.data[key]
 		if currentOk && currentEntry.ExpiresAt > 0 && time.Now().UnixNano() > currentEntry.ExpiresAt {
 			delete(s.data, key)
+			s.removeKey(key)
 		}
 		return "", false, nil
 	}
@@ -82,6 +88,7 @@ func (s *KVStore) IncrBy(key string, delta int64) (int64, error) {
 	// Handle expiry inside the critical section
 	if ok && entry.ExpiresAt > 0 && time.Now().UnixNano() > entry.ExpiresAt {
 		delete(s.data, key)
+		s.removeKey(key)
 		ok = false
 	}
 
@@ -112,5 +119,8 @@ func (s *KVStore) IncrBy(key string, delta int64) (int64, error) {
 func (s *KVStore) Delete(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.data, key)
+	if _, exists := s.data[key]; exists {
+		delete(s.data, key)
+		s.removeKey(key)
+	}
 }

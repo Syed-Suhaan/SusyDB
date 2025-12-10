@@ -17,6 +17,7 @@ func (s *KVStore) HSet(key, field, value string) error {
 		if entry.ExpiresAt > 0 && time.Now().UnixNano() > entry.ExpiresAt {
 			exists = false
 			delete(s.data, key)
+			s.removeKey(key)
 		} else {
 			// Verify type is Map
 			_, isMap := entry.Value.(map[string]string)
@@ -56,6 +57,7 @@ func (s *KVStore) HGet(key, field string) (string, bool, error) {
 		currentEntry, currentOk := s.data[key]
 		if currentOk && currentEntry.ExpiresAt > 0 && time.Now().UnixNano() > currentEntry.ExpiresAt {
 			delete(s.data, key)
+			s.removeKey(key)
 		}
 		return "", false, nil
 	}
@@ -86,6 +88,7 @@ func (s *KVStore) HGetAll(key string) (map[string]string, bool, error) {
 		currentEntry, currentOk := s.data[key]
 		if currentOk && currentEntry.ExpiresAt > 0 && time.Now().UnixNano() > currentEntry.ExpiresAt {
 			delete(s.data, key)
+			s.removeKey(key)
 		}
 		return nil, false, nil
 	}
@@ -116,6 +119,7 @@ func (s *KVStore) HDel(key, field string) (bool, error) {
 
 	if entry.ExpiresAt > 0 && time.Now().UnixNano() > entry.ExpiresAt {
 		delete(s.data, key)
+		s.removeKey(key)
 		return false, nil
 	}
 

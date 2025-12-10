@@ -43,25 +43,19 @@ func (s *KVStore) gcCycle() {
 	}
 }
 
-// sampleAndClean samples up to gcSampleSize keys and deletes expired ones.
+// sampleAndClean samples up to gcSampleSize random keys and deletes expired ones.
+// Uses the pre-maintained keys slice for TRUE O(1) sampling.
 // Returns the number of expired keys found.
 func (s *KVStore) sampleAndClean() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	keyCount := len(s.data)
+	keyCount := len(s.keys)
 	if keyCount == 0 {
 		return 0
 	}
 
-	// Collect keys into a slice for random sampling
-	// This is O(N) but only happens once, not per-key
-	keys := make([]string, 0, keyCount)
-	for k := range s.data {
-		keys = append(keys, k)
-	}
-
-	// Sample random keys
+	// Sample random keys from the pre-maintained slice - TRUE O(1)
 	sampleSize := gcSampleSize
 	if keyCount < sampleSize {
 		sampleSize = keyCount
@@ -70,18 +64,23 @@ func (s *KVStore) sampleAndClean() int {
 	now := time.Now().UnixNano()
 	expired := 0
 
-	// Use Fisher-Yates partial shuffle to get random sample
+	// Sample random indices without building a new slice
 	for i := 0; i < sampleSize; i++ {
-		// Pick a random index from remaining elements
-		j := i + rand.Intn(keyCount-i)
-		keys[i], keys[j] = keys[j], keys[i]
+		// Pick a random key from the slice
+		idx := rand.Intn(keyCount)
+		key := s.keys[idx]
 
 		// Check if this key is expired
-		key := keys[i]
 		entry, exists := s.data[key]
 		if exists && entry.ExpiresAt > 0 && now > entry.ExpiresAt {
 			delete(s.data, key)
+			s.removeKey(key)
 			expired++
+			// Adjust keyCount since we removed a key
+			keyCount = len(s.keys)
+			if keyCount == 0 {
+				break
+			}
 		}
 	}
 
