@@ -48,7 +48,7 @@ func handleClient(conn net.Conn, store *core.KVStore) {
 			continue
 		}
 
-		parts := strings.Split(message, " ")
+		parts := parseCommand(message)
 		if len(parts) == 0 {
 			continue
 		}

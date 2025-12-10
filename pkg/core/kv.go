@@ -6,11 +6,21 @@ import (
 	"time"
 )
 
+// ErrMaxKeysExceeded is returned when the store has reached its key limit.
+var ErrMaxKeysExceeded = fmt.Errorf("ERR max number of keys exceeded")
+
 // Set stores a key-value pair with an optional Time-To-Live (TTL).
 // If ttlSeconds > 0, the key will automatically expire after that duration.
-func (s *KVStore) Set(key string, value string, ttlSeconds int64) {
+// Returns an error if MaxKeys limit is exceeded (and key doesn't exist).
+func (s *KVStore) Set(key string, value string, ttlSeconds int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Check if we're at capacity (only for new keys)
+	_, exists := s.data[key]
+	if !exists && s.MaxKeys > 0 && len(s.data) >= s.MaxKeys {
+		return ErrMaxKeysExceeded
+	}
 
 	var expiresAt int64 = 0
 	if ttlSeconds > 0 {
@@ -21,6 +31,7 @@ func (s *KVStore) Set(key string, value string, ttlSeconds int64) {
 		Value:     value,
 		ExpiresAt: expiresAt,
 	}
+	return nil
 }
 
 // Get retrieves a value by its key.

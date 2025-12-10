@@ -15,7 +15,9 @@ func handleSet(conn net.Conn, store *core.KVStore, parts []string) []byte {
 	}
 	key := parts[1]
 	value := strings.Join(parts[2:], " ")
-	store.Set(key, value, 0)
+	if err := store.Set(key, value, 0); err != nil {
+		return []byte("-ERR " + err.Error() + "\r\n")
+	}
 	return []byte("+OK\r\n")
 }
 
@@ -30,7 +32,9 @@ func handleSetEx(conn net.Conn, store *core.KVStore, parts []string) []byte {
 	if err != nil {
 		return []byte("-ERR invalid expire time in 'setex' command\r\n")
 	}
-	store.Set(key, value, seconds)
+	if err := store.Set(key, value, seconds); err != nil {
+		return []byte("-ERR " + err.Error() + "\r\n")
+	}
 	return []byte("+OK\r\n")
 }
 

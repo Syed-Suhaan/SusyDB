@@ -24,14 +24,27 @@ type KVStore struct {
 	data      map[string]Entry
 	Hub       *Hub      // Pub/Sub Hub
 	startTime time.Time // Used for uptime calculation
+	MaxKeys   int       // Maximum number of keys allowed (0 = unlimited)
 }
 
-// NewKVStore initializes a new, empty Key-Value Store.
+// NewKVStore initializes a new, empty Key-Value Store with no key limit.
 func NewKVStore() *KVStore {
 	return &KVStore{
 		data:      make(map[string]Entry),
 		Hub:       NewHub(),
 		startTime: time.Now(),
+		MaxKeys:   0, // 0 = unlimited
+	}
+}
+
+// NewKVStoreWithLimit initializes a KVStore with a maximum key limit.
+// When the limit is reached, Set operations will return an error.
+func NewKVStoreWithLimit(maxKeys int) *KVStore {
+	return &KVStore{
+		data:      make(map[string]Entry),
+		Hub:       NewHub(),
+		startTime: time.Now(),
+		MaxKeys:   maxKeys,
 	}
 }
 
