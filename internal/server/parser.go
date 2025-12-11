@@ -1,6 +1,10 @@
 package server
 
 import (
+	"bufio"
+	"fmt"
+	"io"
+	"strconv"
 	"strings"
 )
 
@@ -53,4 +57,54 @@ func parseCommand(input string) []string {
 	}
 
 	return parts
+}
+
+// ParseRESP parses a RESP array from the reader.
+// Format: *<count>\r\n$<len>\r\n<content>\r\n...
+func ParseRESP(reader *bufio.Reader) ([]string, error) {
+	// Read array header: *<count>\r\n
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	line = strings.TrimSpace(line)
+	if len(line) == 0 || line[0] != '*' {
+		return nil, fmt.Errorf("invalid RESP array header: %s", line)
+	}
+
+	count, err := strconv.Atoi(line[1:])
+	if err != nil {
+		return nil, fmt.Errorf("invalid RESP array count: %v", err)
+	}
+
+	args := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		// Read bulk string header: $<length>\r\n
+		line, err = reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 || line[0] != '$' {
+			return nil, fmt.Errorf("invalid RESP bulk string header: %s", line)
+		}
+
+		length, err := strconv.Atoi(line[1:])
+		if err != nil {
+			return nil, fmt.Errorf("invalid RESP bulk string length: %v", err)
+		}
+
+		// Read data (plus \r\n)
+		// We read length + 2 bytes
+		data := make([]byte, length+2)
+		_, err = io.ReadFull(reader, data)
+		if err != nil {
+			return nil, err
+		}
+
+		// Trim \r\n from data
+		args = append(args, string(data[:length]))
+	}
+
+	return args, nil
 }

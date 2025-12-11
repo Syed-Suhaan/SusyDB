@@ -2,96 +2,110 @@ package core
 
 import (
 	"fmt"
+	"hash/fnv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
+const ShardCount = 32
+
 // Entry represents a single record in the database.
-// Value is an interface{} to support multiple data types:
-// - string: for standard Set/Get
-// - map[string]string: for Hash operations
-// ExpiresAt is the Unix nanosecond timestamp when the key should expire.
-// If ExpiresAt is 0, the key persists indefinitely.
 type Entry struct {
 	Value     interface{}
 	ExpiresAt int64
 }
 
-// KVStore is the core in-memory database structure.
-// It uses a sync.RWMutex to ensure thread safety for concurrent access.
-// The keys slice enables O(1) random access for probabilistic GC.
-type KVStore struct {
-	mu        sync.RWMutex     // Protects all fields
-	data      map[string]Entry // Key -> Entry
-	keys      []string         // Slice of all keys for O(1) random access
-	keyIndex  map[string]int   // Key -> index in keys slice (for O(1) deletion)
-	Hub       *Hub             // Pub/Sub Hub
-	startTime time.Time        // Used for uptime calculation
-	MaxKeys   int              // Maximum number of keys allowed (0 = unlimited)
+// Shard reduces lock contention by splitting the DB.
+type Shard struct {
+	mu       sync.RWMutex
+	data     map[string]Entry
+	keys     []string
+	keyIndex map[string]int
 }
 
-// NewKVStore initializes a new, empty Key-Value Store with no key limit.
+// KVStore is the core in-memory database structure.
+// Uses Sharding to allow high concurrent throughput.
+type KVStore struct {
+	shards    []*Shard
+	Hub       *Hub
+	startTime time.Time
+	MaxKeys   int
+	keyCount  int64 // Atomic counter for total keys
+}
+
+// NewKVStore initializes a new sharded Key-Value Store.
 func NewKVStore() *KVStore {
-	return &KVStore{
-		data:      make(map[string]Entry),
-		keys:      make([]string, 0),
-		keyIndex:  make(map[string]int),
+	s := &KVStore{
+		shards:    make([]*Shard, ShardCount),
 		Hub:       NewHub(),
 		startTime: time.Now(),
-		MaxKeys:   0, // 0 = unlimited
+		MaxKeys:   0,
+		keyCount:  0,
 	}
+	for i := 0; i < ShardCount; i++ {
+		s.shards[i] = &Shard{
+			data:     make(map[string]Entry),
+			keys:     make([]string, 0),
+			keyIndex: make(map[string]int),
+		}
+	}
+	return s
 }
 
 // NewKVStoreWithLimit initializes a KVStore with a maximum key limit.
-// When the limit is reached, Set operations will return an error.
 func NewKVStoreWithLimit(maxKeys int) *KVStore {
-	return &KVStore{
-		data:      make(map[string]Entry),
-		keys:      make([]string, 0),
-		keyIndex:  make(map[string]int),
+	s := &KVStore{
+		shards:    make([]*Shard, ShardCount),
 		Hub:       NewHub(),
 		startTime: time.Now(),
 		MaxKeys:   maxKeys,
+		keyCount:  0,
 	}
+	for i := 0; i < ShardCount; i++ {
+		s.shards[i] = &Shard{
+			data:     make(map[string]Entry),
+			keys:     make([]string, 0),
+			keyIndex: make(map[string]int),
+		}
+	}
+	return s
 }
 
-// addKey adds a key to the keys slice (call only when key is new).
-// Must be called while holding the write lock.
-func (s *KVStore) addKey(key string) {
+// getShard returns the specific shard for a given key.
+func (s *KVStore) getShard(key string) *Shard {
+	h := fnv.New32a()
+	h.Write([]byte(key))
+	return s.shards[h.Sum32()%ShardCount]
+}
+
+// addKey adds a key to the shard's keys slice.
+// Must be called while holding the SHARD'S write lock.
+func (s *Shard) addKey(key string) {
 	s.keyIndex[key] = len(s.keys)
 	s.keys = append(s.keys, key)
 }
 
-// removeKey removes a key from the keys slice using swap-and-pop for O(1).
-// Must be called while holding the write lock.
-func (s *KVStore) removeKey(key string) {
+// removeKey removes a key from the shard's keys slice.
+// Must be called while holding the SHARD'S write lock.
+func (s *Shard) removeKey(key string) {
 	idx, exists := s.keyIndex[key]
 	if !exists {
 		return
 	}
-
-	// Swap with last element
 	lastIdx := len(s.keys) - 1
 	if idx != lastIdx {
 		lastKey := s.keys[lastIdx]
 		s.keys[idx] = lastKey
 		s.keyIndex[lastKey] = idx
 	}
-
-	// Pop last element
 	s.keys = s.keys[:lastIdx]
 	delete(s.keyIndex, key)
 }
 
-// Info returns a formatted string containing server statistics.
-// This is used by the INFO command for observability.
+// Info aggregates stats.
 func (s *KVStore) Info() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	uptime := time.Since(s.startTime).Seconds()
-	keyCount := len(s.data)
-
-	// Format mimics the Redis INFO command output style
-	return fmt.Sprintf("# Server\r\nsubydb_version:1.2.0\r\nuptime_in_seconds:%.0f\r\n\r\n# Stats\r\nkeys:%d\r\n", uptime, keyCount)
+	totalKeys := atomic.LoadInt64(&s.keyCount)
+	return fmt.Sprintf("# Server\r\nsubydb_version:1.3.0\r\nuptime_in_seconds:%.0f\r\n\r\n# Stats\r\nkeys:%d\r\n", uptime, totalKeys)
 }

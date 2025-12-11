@@ -2,22 +2,24 @@ package core
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
 // HSet sets a specific field in a Hash map stored at key.
-// Creates the Hash if it doesn't verify existence.
 func (s *KVStore) HSet(key, field, value string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	shard := s.getShard(key)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
 
-	entry, exists := s.data[key]
+	entry, exists := shard.data[key]
 	if exists {
 		// Clean up if expired
 		if entry.ExpiresAt > 0 && time.Now().UnixNano() > entry.ExpiresAt {
 			exists = false
-			delete(s.data, key)
-			s.removeKey(key)
+			delete(shard.data, key)
+			shard.removeKey(key)
+			atomic.AddInt64(&s.keyCount, -1)
 		} else {
 			// Verify type is Map
 			_, isMap := entry.Value.(map[string]string)
@@ -28,23 +30,34 @@ func (s *KVStore) HSet(key, field, value string) error {
 	}
 
 	if !exists {
+		// New key creation
+		if s.MaxKeys > 0 {
+			currentKeys := atomic.LoadInt64(&s.keyCount)
+			if currentKeys >= int64(s.MaxKeys) {
+				return ErrMaxKeysExceeded
+			}
+		}
+
 		entry = Entry{
 			Value:     make(map[string]string),
 			ExpiresAt: 0,
 		}
+		shard.addKey(key)
+		atomic.AddInt64(&s.keyCount, 1)
 	}
 
 	hash := entry.Value.(map[string]string)
 	hash[field] = value
-	s.data[key] = entry
+	shard.data[key] = entry
 	return nil
 }
 
 // HGet retrieves a specific field from a Hash.
 func (s *KVStore) HGet(key, field string) (string, bool, error) {
-	s.mu.RLock()
-	entry, exists := s.data[key]
-	s.mu.RUnlock()
+	shard := s.getShard(key)
+	shard.mu.RLock()
+	entry, exists := shard.data[key]
+	shard.mu.RUnlock()
 
 	if !exists {
 		return "", false, nil
@@ -52,12 +65,13 @@ func (s *KVStore) HGet(key, field string) (string, bool, error) {
 
 	// Double-checked locking for expiry
 	if entry.ExpiresAt > 0 && time.Now().UnixNano() > entry.ExpiresAt {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		currentEntry, currentOk := s.data[key]
+		shard.mu.Lock()
+		defer shard.mu.Unlock()
+		currentEntry, currentOk := shard.data[key]
 		if currentOk && currentEntry.ExpiresAt > 0 && time.Now().UnixNano() > currentEntry.ExpiresAt {
-			delete(s.data, key)
-			s.removeKey(key)
+			delete(shard.data, key)
+			shard.removeKey(key)
+			atomic.AddInt64(&s.keyCount, -1)
 		}
 		return "", false, nil
 	}
@@ -72,23 +86,24 @@ func (s *KVStore) HGet(key, field string) (string, bool, error) {
 }
 
 // HGetAll returns all fields and values in a Hash.
-// Returns a copy of the map to ensure thread safety outside the lock.
 func (s *KVStore) HGetAll(key string) (map[string]string, bool, error) {
-	s.mu.RLock()
-	entry, exists := s.data[key]
-	s.mu.RUnlock()
+	shard := s.getShard(key)
+	shard.mu.RLock()
+	entry, exists := shard.data[key]
+	shard.mu.RUnlock()
 
 	if !exists {
 		return nil, false, nil
 	}
 
 	if entry.ExpiresAt > 0 && time.Now().UnixNano() > entry.ExpiresAt {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		currentEntry, currentOk := s.data[key]
+		shard.mu.Lock()
+		defer shard.mu.Unlock()
+		currentEntry, currentOk := shard.data[key]
 		if currentOk && currentEntry.ExpiresAt > 0 && time.Now().UnixNano() > currentEntry.ExpiresAt {
-			delete(s.data, key)
-			s.removeKey(key)
+			delete(shard.data, key)
+			shard.removeKey(key)
+			atomic.AddInt64(&s.keyCount, -1)
 		}
 		return nil, false, nil
 	}
@@ -98,7 +113,7 @@ func (s *KVStore) HGetAll(key string) (map[string]string, bool, error) {
 		return nil, true, fmt.Errorf("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
-	// Return a copy to prevent race conditions on the map reference
+	// Return a copy to prevent race conditions
 	copyMap := make(map[string]string)
 	for k, v := range hash {
 		copyMap[k] = v
@@ -109,17 +124,19 @@ func (s *KVStore) HGetAll(key string) (map[string]string, bool, error) {
 // HDel deletes a specific field from a Hash.
 // Returns true if the field was present and deleted.
 func (s *KVStore) HDel(key, field string) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	shard := s.getShard(key)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
 
-	entry, exists := s.data[key]
+	entry, exists := shard.data[key]
 	if !exists {
 		return false, nil
 	}
 
 	if entry.ExpiresAt > 0 && time.Now().UnixNano() > entry.ExpiresAt {
-		delete(s.data, key)
-		s.removeKey(key)
+		delete(shard.data, key)
+		shard.removeKey(key)
+		atomic.AddInt64(&s.keyCount, -1)
 		return false, nil
 	}
 
